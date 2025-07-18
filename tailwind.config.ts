@@ -61,6 +61,13 @@ export default {
 					'accent-foreground': 'hsl(var(--sidebar-accent-foreground))',
 					border: 'hsl(var(--sidebar-border))',
 					ring: 'hsl(var(--sidebar-ring))'
+				},
+				// Parking system colors
+				parking: {
+					available: 'hsl(var(--available))',
+					occupied: 'hsl(var(--occupied))',
+					assigned: 'hsl(var(--assigned))',
+					reserved: 'hsl(var(--reserved))'
 				}
 			},
 			borderRadius: {

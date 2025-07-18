@@ -10,6 +10,8 @@ export interface ParkingSlot {
   assignedTo?: string;
   occupiedSince?: Date;
   assignedAt?: Date;
+  section?: string;
+  distanceFromEntrance?: number;
 }
 
 export interface ParkingLot {

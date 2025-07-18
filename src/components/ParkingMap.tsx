@@ -3,7 +3,8 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ParkingSlot } from '@/types/parking';
-import { Car, Navigation, Zap, Accessibility, Check, X } from 'lucide-react';
+import { SlotDetails } from '@/components/SlotDetails';
+import { Car, Navigation, Zap, Accessibility, Check, X, Filter } from 'lucide-react';
 
 interface ParkingMapProps {
   slots: ParkingSlot[];
@@ -95,9 +96,9 @@ export const ParkingMap: React.FC<ParkingMapProps> = ({
     }
   };
 
-  // Generate grid layout
-  const gridCols = 10;
-  const gridRows = 8;
+  // Generate realistic parking lot layout
+  const gridCols = 12;
+  const gridRows = 10;
 
   return (
     <div className={`glass-card p-6 ${isARMode ? 'animate-scan' : ''}`}>
@@ -153,34 +154,79 @@ export const ParkingMap: React.FC<ParkingMapProps> = ({
           </div>
         )}
 
-        {/* Generate parking slots */}
+        {/* Generate realistic parking layout */}
         {Array.from({ length: gridCols * gridRows }, (_, index) => {
           const x = index % gridCols;
           const y = Math.floor(index / gridCols);
           
-          // Skip some positions for driving lanes
-          const isDrivingLane = (x === 2 || x === 5 || x === 7) && (y === 2 || y === 5);
+          // Create realistic driving lanes and parking sections
+          const isMainDrivingLane = y === 4; // Main horizontal lane
+          const isVerticalLane = x === 3 || x === 8; // Vertical lanes
+          const isEntrance = (x === 0 && y === 4) || (x === 11 && y === 4);
+          const isCornerSpace = (x === 3 && y === 4) || (x === 8 && y === 4);
           
-          if (isDrivingLane) {
+          // Define parking sections
+          const getSection = () => {
+            if (x < 3) return 'A';
+            if (x > 3 && x < 8) return 'B'; 
+            if (x > 8) return 'C';
+            return '';
+          };
+          
+          if (isEntrance) {
+            return (
+              <div 
+                key={`entrance-${index}`}
+                className="bg-gradient-to-r from-primary/20 to-transparent rounded border-2 border-primary/40 flex items-center justify-center relative"
+              >
+                <span className="text-xs font-bold text-primary">
+                  {x === 0 ? 'ENTRY' : 'EXIT'}
+                </span>
+              </div>
+            );
+          }
+          
+          if (isMainDrivingLane || isVerticalLane || isCornerSpace) {
             return (
               <div 
                 key={`lane-${index}`}
-                className="bg-muted/20 rounded border border-muted/30 flex items-center justify-center"
+                className="bg-muted/10 rounded border border-dashed border-muted/30 flex items-center justify-center relative"
               >
-                <div className="w-1 h-8 bg-muted/50 rounded"></div>
+                {isMainDrivingLane && !isVerticalLane && !isCornerSpace && (
+                  <div className="flex space-x-1">
+                    <div className="w-0.5 h-6 bg-muted/40 rounded"></div>
+                    <div className="w-0.5 h-6 bg-muted/40 rounded"></div>
+                  </div>
+                )}
+                {isVerticalLane && !isMainDrivingLane && (
+                  <div className="flex flex-col space-y-1">
+                    <div className="w-6 h-0.5 bg-muted/40 rounded"></div>
+                    <div className="w-6 h-0.5 bg-muted/40 rounded"></div>
+                  </div>
+                )}
               </div>
             );
           }
 
+          // Generate slot with section-based numbering
+          const section = getSection();
+          const sectionIndex = Math.floor(Math.random() * 99) + 1;
+          const slotTypes = ['regular', 'electric', 'disabled'];
+          const randomType = slotTypes[Math.floor(Math.random() * slotTypes.length)];
+          const isElectric = randomType === 'electric' && Math.random() > 0.85;
+          const isDisabled = randomType === 'disabled' && Math.random() > 0.9;
+          
           const slot = slots.find(s => s.x === x && s.y === y) || {
-            id: `slot-${index}`,
+            id: `slot-${section}${sectionIndex}`,
             lotId: 'lot-1',
-            number: `A${index.toString().padStart(2, '0')}`,
-            status: Math.random() > 0.7 ? 'occupied' : 'available',
+            number: `${section}${sectionIndex.toString().padStart(2, '0')}`,
+            status: Math.random() > 0.65 ? 'occupied' : 'available',
             x,
             y,
             floor: 1,
-            type: 'regular'
+            type: isElectric ? 'electric' : isDisabled ? 'disabled' : 'regular',
+            section,
+            distanceFromEntrance: Math.abs(x - 0) + Math.abs(y - 4) // Distance from entrance
           } as ParkingSlot;
 
           return (
@@ -210,49 +256,48 @@ export const ParkingMap: React.FC<ParkingMapProps> = ({
         })}
       </div>
 
-      {/* Slot Confirmation */}
+      {/* Slot Confirmation with Details */}
       {selectedSlot && !routingTo && (
-        <Card className="glass-card p-4 mt-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 slot-available rounded-lg border-2 flex items-center justify-center">
-                <Car className="w-4 h-4" />
-              </div>
+        <div className="mt-6 space-y-4">
+          <SlotDetails 
+            slot={slots.find(s => s.id === selectedSlot)!} 
+            userPosition={userPosition}
+          />
+          <Card className="glass-card p-4">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-bold">
-                  Slot {slots.find(s => s.id === selectedSlot)?.number} Selected
-                </h3>
+                <h3 className="font-bold">Ready to Confirm?</h3>
                 <p className="text-sm text-muted-foreground">
-                  Click confirm to assign this slot and start navigation
+                  This slot will be reserved for you and navigation will begin
                 </p>
               </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => onSlotSelect?.(null)}
+                  disabled={isConfirming}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => selectedSlot && onSlotConfirm?.(selectedSlot)}
+                  disabled={isConfirming}
+                  className="glow-primary"
+                >
+                  <Check className="w-4 h-4 mr-2" />
+                  {isConfirming ? 'Confirming...' : 'Confirm & Navigate'}
+                </Button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onSlotSelect?.(null)}
-                disabled={isConfirming}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Cancel
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => selectedSlot && onSlotConfirm?.(selectedSlot)}
-                disabled={isConfirming}
-                className="glow-primary"
-              >
-                <Check className="w-4 h-4 mr-2" />
-                {isConfirming ? 'Confirming...' : 'Confirm Slot'}
-              </Button>
-            </div>
-          </div>
-        </Card>
+          </Card>
+        </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 gap-4 mt-6">
+      {/* Enhanced Stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
         <Card className="glass-card p-4 text-center">
           <div className="text-2xl font-bold text-green-400">
             {slots.filter(s => s.status === 'available').length}
@@ -265,6 +310,41 @@ export const ParkingMap: React.FC<ParkingMapProps> = ({
           </div>
           <div className="text-sm text-muted-foreground">Occupied</div>
         </Card>
+        <Card className="glass-card p-4 text-center">
+          <div className="text-2xl font-bold text-yellow-400">
+            {slots.filter(s => s.type === 'electric').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Electric</div>
+        </Card>
+        <Card className="glass-card p-4 text-center">
+          <div className="text-2xl font-bold text-blue-400">
+            {slots.filter(s => s.type === 'disabled').length}
+          </div>
+          <div className="text-sm text-muted-foreground">Accessible</div>
+        </Card>
+      </div>
+
+      {/* Section Quick Nav */}
+      <div className="flex gap-2 mt-4 justify-center">
+        {['A', 'B', 'C'].map(section => (
+          <Button
+            key={section}
+            variant="outline"
+            size="sm"
+            className="glass-card"
+            onClick={() => {
+              const sectionSlots = slots.filter(s => s.section === section && s.status === 'available');
+              if (sectionSlots.length > 0) {
+                const nearestSlot = sectionSlots.reduce((closest, slot) => 
+                  slot.distanceFromEntrance < closest.distanceFromEntrance ? slot : closest
+                );
+                onSlotSelect?.(nearestSlot.id);
+              }
+            }}
+          >
+            Section {section} ({slots.filter(s => s.section === section && s.status === 'available').length})
+          </Button>
+        ))}
       </div>
     </div>
   );

@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ParkingSlot } from '@/types/parking';
-import { Car, Navigation, Zap, Accessibility } from 'lucide-react';
+import { Car, Navigation, Zap, Accessibility, Check, X } from 'lucide-react';
 
 interface ParkingMapProps {
   slots: ParkingSlot[];
   selectedSlot?: string;
-  onSlotSelect?: (slotId: string) => void;
+  onSlotSelect?: (slotId: string | null) => void;
+  onSlotConfirm?: (slotId: string) => void;
   userPosition?: { x: number; y: number };
   routingTo?: string;
   isARMode?: boolean;
+  isConfirming?: boolean;
 }
 
 export const ParkingMap: React.FC<ParkingMapProps> = ({
   slots,
   selectedSlot,
   onSlotSelect,
+  onSlotConfirm,
   userPosition,
   routingTo,
-  isARMode = false
+  isARMode = false,
+  isConfirming = false
 }) => {
   const [animatingSlots, setAnimatingSlots] = useState<Set<string>>(new Set());
 
@@ -76,6 +81,18 @@ export const ParkingMap: React.FC<ParkingMapProps> = ({
     const selectedClass = isSelected ? "ring-4 ring-primary scale-110" : "";
     
     return `${baseClass} ${statusClass} ${selectedClass}`;
+  };
+
+  const handleSlotClick = (slot: ParkingSlot) => {
+    if (slot.status !== 'available' && slot.status !== 'assigned') return;
+    
+    // If clicking the same slot that's already selected, deselect it
+    if (selectedSlot === slot.id) {
+      onSlotSelect?.(null);
+    } else if (slot.status === 'available') {
+      // Only allow selecting available slots
+      onSlotSelect?.(slot.id);
+    }
   };
 
   // Generate grid layout
@@ -171,7 +188,7 @@ export const ParkingMap: React.FC<ParkingMapProps> = ({
               key={slot.id}
               className={getSlotClass(slot)}
               style={{ aspectRatio: '1' }}
-              onClick={() => onSlotSelect?.(slot.id)}
+              onClick={() => handleSlotClick(slot)}
             >
               {getSlotIcon(slot)}
               <span className="absolute bottom-0 text-xs font-mono">
@@ -192,6 +209,47 @@ export const ParkingMap: React.FC<ParkingMapProps> = ({
           );
         })}
       </div>
+
+      {/* Slot Confirmation */}
+      {selectedSlot && !routingTo && (
+        <Card className="glass-card p-4 mt-6">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 slot-available rounded-lg border-2 flex items-center justify-center">
+                <Car className="w-4 h-4" />
+              </div>
+              <div>
+                <h3 className="font-bold">
+                  Slot {slots.find(s => s.id === selectedSlot)?.number} Selected
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  Click confirm to assign this slot and start navigation
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onSlotSelect?.(null)}
+                disabled={isConfirming}
+              >
+                <X className="w-4 h-4 mr-2" />
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => selectedSlot && onSlotConfirm?.(selectedSlot)}
+                disabled={isConfirming}
+                className="glow-primary"
+              >
+                <Check className="w-4 h-4 mr-2" />
+                {isConfirming ? 'Confirming...' : 'Confirm Slot'}
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 gap-4 mt-6">

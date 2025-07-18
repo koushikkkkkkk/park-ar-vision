@@ -28,6 +28,8 @@ export const ParkingSystem = () => {
   // State management
   const [currentUser, setCurrentUser] = useState<UserSession | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string>('');
+  const [confirmedSlot, setConfirmedSlot] = useState<string>('');
+  const [isConfirming, setIsConfirming] = useState(false);
   const [isARActive, setIsARActive] = useState(false);
   const [currentRoute, setCurrentRoute] = useState<ARRoute | null>(null);
   const [userPosition, setUserPosition] = useState({ x: 1, y: 7 });
@@ -123,43 +125,78 @@ export const ParkingSystem = () => {
     }
   }, [qrToken, isAdmin]);
 
-  const handleSlotSelect = (slotId: string) => {
+  const handleSlotSelect = (slotId: string | null) => {
+    if (!slotId) {
+      // Deselect current slot
+      setSelectedSlot('');
+      return;
+    }
+
     const slot = parkingSlots.find(s => s.id === slotId);
     if (!slot || slot.status !== 'available') {
       toast.error('This slot is not available');
       return;
     }
 
+    // Only set as selected, don't assign yet
     setSelectedSlot(slotId);
+    toast.info(`Slot ${slot.number} selected. Click confirm to assign.`);
+  };
+
+  const handleSlotConfirm = async (slotId: string) => {
+    const slot = parkingSlots.find(s => s.id === slotId);
+    if (!slot) return;
+
+    setIsConfirming(true);
     
-    // Update slot status to assigned
-    setParkingSlots(prev => 
-      prev.map(s => 
-        s.id === slotId 
-          ? { ...s, status: 'assigned', assignedTo: currentUser?.userId, assignedAt: new Date() }
-          : s
-      )
-    );
+    try {
+      // Simulate confirmation delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      // Update slot status to assigned
+      setParkingSlots(prev => 
+        prev.map(s => 
+          s.id === slotId 
+            ? { ...s, status: 'assigned', assignedTo: currentUser?.userId, assignedAt: new Date() }
+            : s
+        )
+      );
 
-    // Create mock route
-    const slot_position = parkingSlots.find(s => s.id === slotId);
-    if (slot_position) {
-      const mockRoute: ARRoute = {
-        id: 'route-1',
-        sessionId: currentUser?.id || 'session-1',
-        waypoints: [
-          { x: userPosition.x, y: userPosition.y, floor: 1, instruction: 'Start walking forward', direction: 'forward' },
-          { x: userPosition.x + 2, y: userPosition.y, floor: 1, instruction: 'Continue straight', direction: 'straight' },
-          { x: slot_position.x, y: userPosition.y, floor: 1, instruction: 'Turn right towards your slot', direction: 'right' },
-          { x: slot_position.x, y: slot_position.y, floor: 1, instruction: `You have arrived at slot ${slot_position.number}`, direction: 'forward' }
-        ],
-        estimatedTime: 120,
-        distance: 50
-      };
-      setCurrentRoute(mockRoute);
+      // Set as confirmed slot
+      setConfirmedSlot(slotId);
+      setSelectedSlot('');
+
+      // Create mock route
+      const slot_position = parkingSlots.find(s => s.id === slotId);
+      if (slot_position) {
+        const mockRoute: ARRoute = {
+          id: 'route-1',
+          sessionId: currentUser?.id || 'session-1',
+          waypoints: [
+            { x: userPosition.x, y: userPosition.y, floor: 1, instruction: 'Start walking forward', direction: 'forward' },
+            { x: userPosition.x + 2, y: userPosition.y, floor: 1, instruction: 'Continue straight', direction: 'straight' },
+            { x: slot_position.x, y: userPosition.y, floor: 1, instruction: 'Turn right towards your slot', direction: 'right' },
+            { x: slot_position.x, y: slot_position.y, floor: 1, instruction: `You have arrived at slot ${slot_position.number}`, direction: 'forward' }
+          ],
+          estimatedTime: 120,
+          distance: 50
+        };
+        setCurrentRoute(mockRoute);
+      }
+
+      toast.success(`Slot ${slot.number} confirmed! Route generated.`);
+      
+      // Automatically start AR navigation
+      setTimeout(() => {
+        setIsARActive(true);
+        toast.success('AR Navigation activated!');
+      }, 1000);
+
+    } catch (error) {
+      toast.error('Failed to confirm slot');
+    } finally {
+      setIsConfirming(false);
     }
-
-    toast.success(`Slot ${slot?.number} assigned to you!`);
   };
 
   const handleSlotUpdate = (slotId: string, status: ParkingSlot['status']) => {
@@ -307,9 +344,11 @@ export const ParkingSystem = () => {
               slots={parkingSlots}
               selectedSlot={selectedSlot}
               onSlotSelect={handleSlotSelect}
+              onSlotConfirm={handleSlotConfirm}
               userPosition={userPosition}
-              routingTo={selectedSlot}
+              routingTo={confirmedSlot}
               isARMode={isARActive}
+              isConfirming={isConfirming}
             />
           </TabsContent>
 
@@ -319,7 +358,7 @@ export const ParkingSystem = () => {
               isActive={isARActive}
               onStartNavigation={startARNavigation}
               onStopNavigation={stopARNavigation}
-              destinationSlot={parkingSlots.find(s => s.id === selectedSlot)?.number}
+              destinationSlot={parkingSlots.find(s => s.id === confirmedSlot)?.number}
             />
           </TabsContent>
         </Tabs>
